@@ -1,0 +1,27 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "The API for the E-suggest Application.",
+  "main": "server.js",
+  "scripts": {
+    "start": "NODE_ENV=production node server/server.js",
+    "devstart": "nodemon server/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "express": "^4.17.3",
+    "html-to-text": "^8.2.0",
+    "jsonwebtoken": "^8.5.1",
+    "mongoose": "^6.4.6",
+    "morgan": "^1.10.0",
+    "nodemailer": "^6.7.3",
+    "pug": "^3.0.2",
+    "validator": "^13.7.0"
+  }
+}
