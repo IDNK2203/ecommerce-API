@@ -6,7 +6,7 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 // Route
 const authRoutes = require("./routes/authRoutes");
-const recipeRoutes = require("./routes/recipeRoutes");
+const productRoutes = require("./routes/productRoutes");
 
 // setup express app
 const app = express();
@@ -24,7 +24,7 @@ if (app.get("env") !== "production") {
 
 // API Routes
 app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/recipe", recipeRoutes);
+app.use("/api/v1/product", productRoutes);
 
 // catch 404 and forward to error handler
 app.all("*", (req, res, next) => {
