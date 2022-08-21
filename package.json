@@ -23,5 +23,8 @@
     "nodemailer": "^6.7.3",
     "pug": "^3.0.2",
     "validator": "^13.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.19"
   }
 }
