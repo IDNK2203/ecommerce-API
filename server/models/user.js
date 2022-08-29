@@ -4,6 +4,31 @@ const crypto = require("crypto");
 const validator = require("validator");
 
 const { Schema } = mongoose;
+
+const cartSchema = new Schema({
+  totalAmount:{
+    type:Number
+  },
+  noOfProducts:{
+    type:Number
+  },
+  products:[{
+    id:{ type: Schema.Types.ObjectId, ref: 'product' },
+    title:{
+      type: String,
+    },
+    price:{
+      type:Number
+    },
+    summary:{
+      type: String,
+    },
+    quantity:{
+      type:Number
+    }
+  }]
+})
+
 const userSchema = new Schema(
   {
     firstName: {
@@ -51,6 +76,7 @@ const userSchema = new Schema(
     passwordResetToken: String,
     tokenExpiresAt: Date,
     updatePasswordAt: Date,
+    cartInfo:cartSchema
   },
   {
     timestamps: true,
