@@ -1,20 +1,21 @@
 const User = require("../models/user");
+const Product = require("../models/product");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 
 exports.addItemToCart = catchAsync(async (req, res, next) => {
   const userId = req.user.id;
-  const payload = {
-    price: req.body.price, // x
+  const reqpPayload = {
     productId: req.body.productId,
-    title: req.body.title, // x
-    summary: req.body.summary, // x
     quantity: 1,
-    subTotal: req.body.price,
   };
 
-  // check if the the user cart exists
   const user = await User.findById({ _id: userId });
+  const { title, summary, price } = await Product.findById({
+    _id: reqpPayload.productId,
+  });
+  const payload = { ...reqpPayload, title, summary, price, subTotal: price };
+
   let { cartInfo: userCart } = user;
 
   const isCartEmpty =
@@ -30,13 +31,11 @@ exports.addItemToCart = catchAsync(async (req, res, next) => {
       userCart.products.push(payload);
       user.markModified("cartInfo");
     } else {
-      // send back an error
+      return next(new AppError("Wrong route, try the update cart route"));
     }
   } else {
-    const productsArray = [payload];
     userCart = {
-      products: productsArray,
-      // check if the user cart exists
+      products: [payload],
     };
   }
 
@@ -50,7 +49,9 @@ exports.addItemToCart = catchAsync(async (req, res, next) => {
 });
 
 exports.updateCartItem = catchAsync(async (req, res, next) => {
-  // TODO add check for if operation type was specified.
+  if (!req.body.operationType) {
+    return next(new AppError("Please specify operation Type"));
+  }
   const userId = req.user.id;
   const { id } = req.params;
   const payload = {
@@ -60,9 +61,10 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
   const user = await User.findById({ _id: userId });
   let { cartInfo: userCart } = user;
 
-  let cartItem = await userCart.products.id(id);
-  // TODO add check for if cart item doesn't exist.
-
+  let cartItem = userCart.products.id(id);
+  if (!cartItem) {
+    return next(new AppError("This product could not be found in cart", 404));
+  }
   if (req.body.operationType === "increment") {
     user.cartInfo.products.id(id).quantity =
       payload.quantity === 1 ? cartItem.quantity + 1 : payload.quantity;
@@ -72,10 +74,10 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
   }
 
   if (!user.cartInfo.products.id(id).quantity) {
-    return next("route");
+    let cartItem = await user.cartInfo.products.id(id).remove();
+  } else {
+    user.cartInfo.products.id(id).subTotal = cartItem.price * cartItem.quantity;
   }
-
-  user.cartInfo.products.id(id).subTotal = cartItem.price * cartItem.quantity;
 
   user.markModified("cartInfo");
   const _user = await user.save({ validateBeforeSave: false });
@@ -87,9 +89,7 @@ exports.updateCartItem = catchAsync(async (req, res, next) => {
 });
 
 exports.getCartItems = catchAsync(async (req, res, next) => {
-  // _/
   const userId = req.user.id;
-  // check if the the user cart exists
   const user = await User.findById({ _id: userId });
   let { cartInfo } = user;
 
@@ -100,14 +100,17 @@ exports.getCartItems = catchAsync(async (req, res, next) => {
 });
 
 exports.removeCartItem = catchAsync(async (req, res, next) => {
-  // _/
   const userId = req.user.id;
   const { id } = req.params;
-  // check if the the user cart exists
   const user = await User.findById({ _id: userId });
   let { cartInfo: userCartCopy } = user;
 
-  let cartItem = await userCartCopy.products.id(id).remove();
+  let cartItem = userCartCopy.products.id(id);
+  if (!cartItem) {
+    return next(new AppError("This product could not be found in cart", 404));
+  }
+  await cartItem.remove();
+  console.log(cartItem);
 
   user.markModified("cartInfo");
   const _user = await user.save({ validateBeforeSave: false });
@@ -118,10 +121,8 @@ exports.removeCartItem = catchAsync(async (req, res, next) => {
 
 // add a empty cart controller
 exports.emptyCart = catchAsync(async (req, res, next) => {
-  // _/
   const userId = req.user.id;
   const { id } = req.params;
-  // check if the the user cart exists
   const user = await User.findById({ _id: userId });
   user.cartInfo.products = [];
 
