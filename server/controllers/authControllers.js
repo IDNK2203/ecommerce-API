@@ -25,6 +25,7 @@ const sendTokenAndResData = async (res, statusCode, user) => {
   if (process.env.NODE_ENV === "production") cookieOptions.secure = true;
   res.cookie("jwt", token, cookieOptions);
 
+  // TODO delete user when the error occurs in token or cookie creation.
   user.password = undefined;
   res.status(statusCode).json({
     status: "success",
@@ -101,11 +102,12 @@ exports.protect = catchAsync(async (req, res, next) => {
     return next(new AppError("This user no longer exists", 401));
 
   if (incomingUser.updatePasswordAtCheck(decodedPayload.iat))
-    //change your account access key after resource access key was created
+    // change your account access key after resource access key was created
     return next(
       new AppError(" please log in again to  view this resource", 401)
     );
   req.user = incomingUser;
+  console.log(req.user.email);
   return next();
 });
 

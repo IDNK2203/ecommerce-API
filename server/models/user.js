@@ -6,28 +6,37 @@ const validator = require("validator");
 const { Schema } = mongoose;
 
 const cartSchema = new Schema({
-  totalAmount:{
-    type:Number
+  totalAmount: {
+    type: Number,
+    default: 0,
+    min: 0,
   },
-  noOfProducts:{
-    type:Number
+  noOfProducts: {
+    type: Number,
+    default: 0,
+    min: 0,
   },
-  products:[{
-    id:{ type: Schema.Types.ObjectId, ref: 'product' },
-    title:{
-      type: String,
+  products: [
+    {
+      productId: { type: Schema.Types.ObjectId, ref: "product" },
+      title: {
+        type: String,
+      },
+      price: {
+        type: Number,
+      },
+      summary: {
+        type: String,
+      },
+      quantity: {
+        type: Number,
+      },
+      subTotal: {
+        type: Number,
+      },
     },
-    price:{
-      type:Number
-    },
-    summary:{
-      type: String,
-    },
-    quantity:{
-      type:Number
-    }
-  }]
-})
+  ],
+});
 
 const userSchema = new Schema(
   {
@@ -76,7 +85,10 @@ const userSchema = new Schema(
     passwordResetToken: String,
     tokenExpiresAt: Date,
     updatePasswordAt: Date,
-    cartInfo:cartSchema
+    cartInfo: {
+      type: cartSchema,
+      default: () => ({}),
+    },
   },
   {
     timestamps: true,
@@ -84,14 +96,43 @@ const userSchema = new Schema(
 );
 
 userSchema.pre("save", async function (next) {
+  // if the password was updated(including oc), hash password
+  if (!this.isModified("cartInfo") || this.isNew) return next();
+
+  const { products } = this.cartInfo;
+  //  cart is modified to having zero products in its product array
+  if (products.length === 0) {
+    this.cartInfo.totalAmount = 0;
+    this.cartInfo.noOfProducts = 0;
+    // if one item is in cart product array
+  } else if (products.length === 1) {
+    this.cartInfo.totalAmount = products[0].subTotal;
+    this.cartInfo.noOfProducts = products[0].quantity;
+  } else {
+    // if more that one item is in cart product array
+    const tA = products.reduce((i, j) => {
+      return i.subTotal + j.subTotal;
+    });
+    const nP = products.reduce((i, j) => {
+      return i.quantity + j.quantity;
+    });
+    this.cartInfo.totalAmount = tA;
+    this.cartInfo.noOfProducts = nP;
+  }
+
+  next();
+});
+
+userSchema.pre("save", async function (next) {
+  // if the password was updated(including new doc), hash password
   if (!this.isModified("password")) return next();
 
   this.password = await bcryptjs.hash(this.password, 12);
   this.passwordConfirm = undefined;
   next();
 });
-
 userSchema.pre("save", async function (next) {
+  // if the password was updated(excluding new doc), hash password
   if (!this.isModified("password") || this.isNew) return next();
 
   this.updatePasswordAt = Date.now() + 1000;

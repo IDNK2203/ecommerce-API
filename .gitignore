@@ -62,6 +62,8 @@ typings/
 *.env
 
 # text files 
+/local
+
 *.txt
 
 # next.js build output

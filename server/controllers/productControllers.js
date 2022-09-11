@@ -3,7 +3,6 @@ const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const APIFeatures = require("../utils/APIFeatures");
 
-
 exports.createProduct = catchAsync(async (req, res, next) => {
   const payload = { ...req.body };
   const product = await Product.create(payload);
@@ -14,7 +13,7 @@ exports.createProduct = catchAsync(async (req, res, next) => {
 });
 
 exports.getProducts = catchAsync(async (req, res, next) => {
-  const AgQuery = new APIFeatures(Product.find(),req.query).filter().sort()
+  const AgQuery = new APIFeatures(Product.find(), req.query).filter().sort();
   const products = await AgQuery.query.exec();
   res.status(200).json({
     status: "success",
@@ -40,7 +39,6 @@ exports.updateProduct = catchAsync(async (req, res, next) => {
     new: true,
     runValidators: true,
   });
-  console.log(product);
   res.status(201).json({
     status: "success",
     product,
