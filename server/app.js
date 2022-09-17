@@ -8,6 +8,7 @@ const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const productRoutes = require("./routes/productRoutes");
 const cartRoutes = require("./routes/cartRoutes");
+const orderRoutes = require("./routes/orderRoutes");
 
 // setup express app
 const app = express();
@@ -27,6 +28,7 @@ if (app.get("env") !== "production") {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/product", productRoutes);
 app.use("/api/v1/cart", cartRoutes);
+app.use("/api/v1/order", orderRoutes);
 
 // catch 404 and forward to error handler
 app.all("*", (req, res, next) => {
