@@ -8,83 +8,115 @@ const User = require("../models/user");
 const Order = require("../models/order");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
+const { v1: uuidv1 } = require("uuid");
 
 exports.checkoutCartItems = catchAsync(async (req, res, next) => {
-  try {
-    const body = {
-      tx_ref: "hooli-tx-1920bbtytty",
-      amount: "100",
-      currency: "NGN",
-      redirect_url: "https://webhook.site/9d0b00ba-9a69-44fa-a43d-a82c33c36fdc",
-      meta: {
-        consumer_id: 23,
-        consumer_mac: "92a3-912ba-1192a",
-      },
-      customer: {
-        email: "user@gmail.com",
-        phonenumber: "080****4528",
-        name: "Yemi Desola",
-      },
-      customizations: {
-        title: "Pied Piper Payments",
-        logo: "http://www.piedpiper.com/app/themes/joystick-v27/images/logo.png",
-      },
-    };
+  const user = req.user;
+  const body = {
+    tx_ref: uuidv1(),
+    amount: user.cartInfo.totalAmount,
+    currency: "NGN",
+    redirect_url: "https://example.com",
+    meta: {
+      consumer_id: user._id,
+      consumer_mac: "92a3-912ba-1192a",
+    },
+    customer: {
+      email: user.email,
+      phonenumber: "080****4528",
+      name: user.firstName + user.lastName,
+    },
+    customizations: {
+      title: "Pied Piper Payments",
+      logo: "http://www.piedpiper.com/app/themes/joystick-v27/images/logo.png",
+    },
+  };
 
-    const response = await fetch("https://api.flutterwave.com/v3/payments", {
-      method: "post",
-      body: JSON.stringify(body),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
-      },
+  const response = await fetch("https://api.flutterwave.com/v3/payments", {
+    method: "post",
+    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`,
+    },
+  });
+  const data = await response.json();
+  res.status(200).json({
+    status: "success",
+    data,
+  });
+});
+
+exports.verifypaymentAfterCheckout = catchAsync(async (req, res, next) => {
+  if (req.query.status === "successful") {
+    const transactionDetails = await flw.Transaction.fetch({
+      ref: req.query.tx_ref,
     });
-    const data = await response.json();
-    res.status(204).json({
-      status: "success",
-      data,
+    const response = await flw.Transaction.verify({
+      id: req.query.transaction_id,
     });
-    console.log(data);
-  } catch (err) {
-    console.log(err.code);
-    console.log(err.response.body);
+
+    if (
+      response?.data?.status === "successful" &&
+      response?.data?.amount === transactionDetails.data[0].amount &&
+      response.data.currency === "NGN"
+    ) {
+      const user = await User.findById({ _id: req.user._id });
+      const { cartInfo } = user;
+      if (cartInfo.products < 1) return next("route");
+      const orderDocPayload = {
+        customer: req.user._id,
+        products: cartInfo.products,
+        totalAmount: cartInfo.totalAmount,
+        noOfProducts: cartInfo.noOfProducts,
+        payment: {
+          paymentId: req.query.tx_ref,
+          transactionId: req.query.transaction_id,
+        },
+        isPaid: true,
+        paidAt: Date.now(),
+      };
+
+      await Order.create(orderDocPayload);
+      user.cartInfo.products = [];
+      user.markModified("cartInfo");
+      const _user = await user.save({ validateBeforeSave: false });
+      res.status(200).json({
+        status: "success",
+        data: response.data,
+      });
+    } else {
+      return next(new AppError("This card has been declined", 400));
+    }
+  } else {
+    return next(new AppError("Your payment was successful", 400));
   }
 });
 
 exports.verifypayment = catchAsync(async (req, res, next) => {
-  try {
-    if (req.query.status === "successful") {
-      const transactionDetails = await flw.Transaction.fetch({
-        //bug
-        ref: req.query.tx_ref,
-      });
-      console.log(transactionDetails);
-      console.log(req.query.transaction_id);
-      const response = await flw.Transaction.verify({
-        id: req.query.transaction_id,
-      });
-      console.log(response);
+  if (req.query.status === "successful") {
+    const transactionDetails = await flw.Transaction.fetch({
+      ref: req.query.tx_ref,
+    });
+    const response = await flw.Transaction.verify({
+      id: req.query.transaction_id,
+    });
 
-      if (
-        response.data.status === "successful" && //bug
-        response.data.amount === transactionDetails.data[0].amount &&
-        response.data.currency === "NGN"
-      ) {
-        // Success! Confirm the customer's payment
-
-        console.log("success yeah");
-      } else {
-        // Inform the customer their payment was unsuccessful
-        console.log(" not success noo");
-      }
-      res.status(204).json({
-        status: "okay",
+    if (
+      response?.data?.status === "successful" &&
+      response?.data?.amount === transactionDetails.data[0].amount &&
+      response.data.currency === "NGN"
+    ) {
+      res.status(200).json({
+        status: "success",
         data: response.data,
       });
+    } else {
+      return next(new AppError("This card has been declined", 400));
     }
-  } catch (err) {
-    console.log(err);
-    console.log(err.code);
-    console.log(err.response);
+  } else {
+    return next(new AppError("Your payment was successful", 400));
   }
 });
+
+// https://example.com/?status=successful&tx_ref=7872e3b0-385e-11ed-b348-fffcdf887960&transaction_id=3750482

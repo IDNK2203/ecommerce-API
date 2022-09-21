@@ -25,6 +25,16 @@ const orderSchema = new Schema({
   paidAt: {
     type: Date,
   },
+  payment: {
+    transactionId: {
+      type: String,
+      required: true,
+    },
+    paymentId: {
+      type: String,
+      required: true,
+    },
+  },
   products: [
     {
       productId: { type: Schema.Types.ObjectId, ref: "product" },

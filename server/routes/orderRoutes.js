@@ -4,6 +4,7 @@ const authControllers = require("../controllers/authControllers");
 
 router.use(authControllers.protect);
 router.post("/checkout", orderControllers.checkoutCartItems);
+router.get("/verify-callback", orderControllers.verifypaymentAfterCheckout);
 router.get("/verify-callback", orderControllers.verifypayment);
 
 module.exports = router;
