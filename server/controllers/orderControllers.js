@@ -9,6 +9,7 @@ const Order = require("../models/order");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { v1: uuidv1 } = require("uuid");
+const APIFeatures = require("../utils/APIFeatures");
 
 exports.checkoutCartItems = catchAsync(async (req, res, next) => {
   const user = req.user;
@@ -117,6 +118,46 @@ exports.verifypayment = catchAsync(async (req, res, next) => {
   } else {
     return next(new AppError("Your payment was successful", 400));
   }
+});
+
+exports.getAllOrders = catchAsync(async (req, res, next) => {
+  const AgQuery = new APIFeatures(Order.find(), req.query).filter().sort();
+  const orders = await AgQuery.query.exec();
+  res.status(200).json({
+    status: "success",
+    orders,
+  });
+});
+exports.getMyOrders = catchAsync(async (req, res, next) => {
+  const orders = await Order.find({ customer: req.user._id }).populate(
+    "customer",
+    "firstName lastName email"
+  );
+  res.status(200).json({
+    status: "success",
+    orders,
+  });
+});
+exports.getMyOrder = catchAsync(async (req, res, next) => {
+  const orders = await Order.find({
+    customer: req.user._id,
+    _id: req.params.orderId,
+  }).populate("customer", "firstName lastName email");
+  res.status(200).json({
+    status: "success",
+    orders,
+  });
+});
+
+exports.getAnOrder = catchAsync(async (req, res, next) => {
+  const order = await Order.findById(req.params.orderId).populate(
+    "customer",
+    "firstName lastName email"
+  );
+  res.status(200).json({
+    status: "success",
+    order,
+  });
 });
 
 // https://example.com/?status=successful&tx_ref=7872e3b0-385e-11ed-b348-fffcdf887960&transaction_id=3750482

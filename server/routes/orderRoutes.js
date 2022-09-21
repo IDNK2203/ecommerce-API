@@ -3,8 +3,14 @@ const orderControllers = require("../controllers/orderControllers.js");
 const authControllers = require("../controllers/authControllers");
 
 router.use(authControllers.protect);
-router.post("/checkout", orderControllers.checkoutCartItems);
+
 router.get("/verify-callback", orderControllers.verifypaymentAfterCheckout);
 router.get("/verify-callback", orderControllers.verifypayment);
+
+router.get("/myorder/:orderId", orderControllers.getMyOrders);
+router.get("/myorders", orderControllers.getMyOrders);
+router.get("/:orderId", orderControllers.getAnOrder);
+router.get("/", orderControllers.getAllOrders);
+router.post("/checkout", orderControllers.checkoutCartItems);
 
 module.exports = router;
