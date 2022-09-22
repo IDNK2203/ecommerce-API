@@ -57,4 +57,9 @@ const orderSchema = new Schema({
   ],
 });
 
+orderSchema.pre(/^find/, function (next) {
+  this.populate("customer", "firstName lastName email");
+  next();
+});
+
 module.exports = mongoose.model("order", orderSchema);

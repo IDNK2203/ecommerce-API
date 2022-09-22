@@ -49,28 +49,29 @@ exports.addItemToCart = catchAsync(async (req, res, next) => {
 });
 
 exports.updateCartItem = catchAsync(async (req, res, next) => {
-  if (!req.body.operationType) {
-    return next(new AppError("Please specify operation Type"));
+  if (!req.body.operationType && !req.body.quantity) {
+    return next(new AppError("Please specify operation Type or quantity"));
   }
   const userId = req.user.id;
   const { id } = req.params;
-  const payload = {
-    quantity: req.body.quantity ? req.body.quantity : 1,
-  };
-
   const user = await User.findById({ _id: userId });
   let { cartInfo: userCart } = user;
-
   let cartItem = userCart.products.id(id);
+
   if (!cartItem) {
     return next(new AppError("This product could not be found in cart", 404));
   }
-  if (req.body.operationType === "increment") {
+
+  if (req.body.quantity) {
     user.cartInfo.products.id(id).quantity =
-      payload.quantity === 1 ? cartItem.quantity + 1 : payload.quantity;
-  } else if (req.body.operationType === "decrement") {
+      1 < req.body.quantity && req.body.quantity <= 10 ? req.body.quantity : 10;
+  } else {
     user.cartInfo.products.id(id).quantity =
-      payload.quantity === 1 ? cartItem.quantity - 1 : payload.quantity;
+      req.body.operationType === "increment"
+        ? cartItem.quantity + 1
+        : req.body.operationType === "decrement"
+        ? cartItem.quantity - 1
+        : cartItem.quantity;
   }
 
   if (!user.cartInfo.products.id(id).quantity) {
@@ -110,8 +111,6 @@ exports.removeCartItem = catchAsync(async (req, res, next) => {
     return next(new AppError("This product could not be found in cart", 404));
   }
   await cartItem.remove();
-  console.log(cartItem);
-
   user.markModified("cartInfo");
   const _user = await user.save({ validateBeforeSave: false });
   res.status(204).json({

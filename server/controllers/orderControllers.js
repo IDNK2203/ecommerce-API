@@ -129,31 +129,28 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
   });
 });
 exports.getMyOrders = catchAsync(async (req, res, next) => {
-  const orders = await Order.find({ customer: req.user._id }).populate(
-    "customer",
-    "firstName lastName email"
-  );
+  const orders = await Order.find({ customer: req.user._id });
   res.status(200).json({
     status: "success",
     orders,
   });
 });
 exports.getMyOrder = catchAsync(async (req, res, next) => {
-  const orders = await Order.find({
+  const order = await Order.find({
     customer: req.user._id,
     _id: req.params.orderId,
-  }).populate("customer", "firstName lastName email");
+  });
+
+  if (!order) return next(new AppError("This error could not be found", 404));
   res.status(200).json({
     status: "success",
-    orders,
+    order,
   });
 });
 
 exports.getAnOrder = catchAsync(async (req, res, next) => {
-  const order = await Order.findById(req.params.orderId).populate(
-    "customer",
-    "firstName lastName email"
-  );
+  const order = await Order.findById(req.params.orderId);
+  if (!order) return next(new AppError("This error could not be found", 404));
   res.status(200).json({
     status: "success",
     order,
