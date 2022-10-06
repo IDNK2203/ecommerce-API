@@ -6,13 +6,46 @@ const flw = new Flutterwave(
 );
 const User = require("../models/user");
 const Order = require("../models/order");
+const factory = require("../controllers/handlerFactory");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const { v1: uuidv1 } = require("uuid");
-const APIFeatures = require("../utils/APIFeatures");
+
+const transactionChecks = (response, transactionDetails) => {
+  return (
+    response?.data?.status === "successful" &&
+    response?.data?.amount === transactionDetails.data[0].amount &&
+    response?.data?.currency === "NGN"
+  );
+};
+
+const createOrder = async (req, next) => {
+  const user = await User.findById({ _id: req.user._id });
+  const { cartInfo } = user;
+  const orderDocPayload = {
+    customer: req.user._id,
+    products: cartInfo.products,
+    totalAmount: cartInfo.totalAmount,
+    noOfProducts: cartInfo.noOfProducts,
+    payment: {
+      paymentId: req.query.tx_ref,
+      transactionId: req.query.transaction_id,
+    },
+    isPaid: true,
+    paidAt: Date.now(),
+  };
+
+  await Order.create(orderDocPayload);
+  user.cartInfo.products = [];
+  user.markModified("cartInfo");
+  const _user = await user.save({ validateBeforeSave: false });
+};
 
 exports.checkoutCartItems = catchAsync(async (req, res, next) => {
   const user = req.user;
+  if (!user.cartInfo.products.length) {
+    return next(new AppError("Add an Item to cart to checkout", 400));
+  }
   const body = {
     tx_ref: uuidv1(),
     amount: user.cartInfo.totalAmount,
@@ -25,7 +58,7 @@ exports.checkoutCartItems = catchAsync(async (req, res, next) => {
     customer: {
       email: user.email,
       phonenumber: "080****4528",
-      name: user.firstName + user.lastName,
+      name: user.fullName,
     },
     customizations: {
       title: "Pied Piper Payments",
@@ -49,6 +82,11 @@ exports.checkoutCartItems = catchAsync(async (req, res, next) => {
 });
 
 exports.verifypaymentAfterCheckout = catchAsync(async (req, res, next) => {
+  if (!req.user.cartInfo.products.length) {
+    return next(
+      new AppError("Only admins can verify already created orders", 400)
+    );
+  }
   if (req.query.status === "successful") {
     const transactionDetails = await flw.Transaction.fetch({
       ref: req.query.tx_ref,
@@ -57,31 +95,9 @@ exports.verifypaymentAfterCheckout = catchAsync(async (req, res, next) => {
       id: req.query.transaction_id,
     });
 
-    if (
-      response?.data?.status === "successful" &&
-      response?.data?.amount === transactionDetails.data[0].amount &&
-      response.data.currency === "NGN"
-    ) {
-      const user = await User.findById({ _id: req.user._id });
-      const { cartInfo } = user;
-      if (cartInfo.products < 1) return next("route");
-      const orderDocPayload = {
-        customer: req.user._id,
-        products: cartInfo.products,
-        totalAmount: cartInfo.totalAmount,
-        noOfProducts: cartInfo.noOfProducts,
-        payment: {
-          paymentId: req.query.tx_ref,
-          transactionId: req.query.transaction_id,
-        },
-        isPaid: true,
-        paidAt: Date.now(),
-      };
+    if (transactionChecks(response, transactionDetails)) {
+      await createOrder(req, next);
 
-      await Order.create(orderDocPayload);
-      user.cartInfo.products = [];
-      user.markModified("cartInfo");
-      const _user = await user.save({ validateBeforeSave: false });
       res.status(200).json({
         status: "success",
         data: response.data,
@@ -90,7 +106,7 @@ exports.verifypaymentAfterCheckout = catchAsync(async (req, res, next) => {
       return next(new AppError("This card has been declined", 400));
     }
   } else {
-    return next(new AppError("Your payment was successful", 400));
+    return next(new AppError("Your payment was not successful", 400));
   }
 });
 
@@ -103,11 +119,7 @@ exports.verifypayment = catchAsync(async (req, res, next) => {
       id: req.query.transaction_id,
     });
 
-    if (
-      response?.data?.status === "successful" &&
-      response?.data?.amount === transactionDetails.data[0].amount &&
-      response.data.currency === "NGN"
-    ) {
+    if (transactionChecks(response, transactionDetails)) {
       res.status(200).json({
         status: "success",
         data: response.data,
@@ -116,45 +128,33 @@ exports.verifypayment = catchAsync(async (req, res, next) => {
       return next(new AppError("This card has been declined", 400));
     }
   } else {
-    return next(new AppError("Your payment was successful", 400));
+    return next(new AppError("Your payment was not successful", 400));
   }
 });
 
-exports.getAllOrders = catchAsync(async (req, res, next) => {
-  const AgQuery = new APIFeatures(Order.find(), req.query).filter().sort();
-  const orders = await AgQuery.query.exec();
-  res.status(200).json({
-    status: "success",
-    orders,
-  });
-});
-exports.getMyOrders = catchAsync(async (req, res, next) => {
-  const orders = await Order.find({ customer: req.user._id });
-  res.status(200).json({
-    status: "success",
-    orders,
-  });
-});
 exports.getMyOrder = catchAsync(async (req, res, next) => {
-  const order = await Order.find({
-    customer: req.user._id,
-    _id: req.params.orderId,
-  });
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return next(
+      new AppError(`No ${Order.constructor.modelName} found with that ID`, 404)
+    );
+  }
+  console.log(order.customer.id, req.user.id);
+  if (order.customer.id !== req.user.id)
+    return next(
+      new AppError("you cannot access another person's order information", 400)
+    );
 
-  if (!order) return next(new AppError("This error could not be found", 404));
   res.status(200).json({
     status: "success",
     order,
   });
 });
 
-exports.getAnOrder = catchAsync(async (req, res, next) => {
-  const order = await Order.findById(req.params.orderId);
-  if (!order) return next(new AppError("This error could not be found", 404));
-  res.status(200).json({
-    status: "success",
-    order,
-  });
-});
-
-// https://example.com/?status=successful&tx_ref=7872e3b0-385e-11ed-b348-fffcdf887960&transaction_id=3750482
+exports.getMyOrdersMW = (req, res, next) => {
+  req.body.filter = { customer: req.user._id };
+  next();
+};
+exports.getMyOrders = factory.getAll(Order);
+exports.getAllOrders = factory.getAll(Order);
+exports.getAnOrder = factory.getOne(Order);

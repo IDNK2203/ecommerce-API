@@ -4,13 +4,17 @@ const authControllers = require("../controllers/authControllers");
 
 router.use(authControllers.protect);
 
-router.get("/verify-callback", orderControllers.verifypaymentAfterCheckout);
+router.get("/verify-payment-ck", orderControllers.verifypaymentAfterCheckout);
 // add an authorization middleware, granting access to only admin.
-router.get("/verify-callback", orderControllers.verifypayment);
+router.get("/verify-payment", orderControllers.verifypayment);
 
-router.get("/myorder/:orderId", orderControllers.getMyOrders);
-router.get("/myorders", orderControllers.getMyOrders);
-router.get("/:orderId", orderControllers.getAnOrder);
+router.get("/myorder/:id", orderControllers.getMyOrder);
+router.get(
+  "/myorders",
+  orderControllers.getMyOrdersMW,
+  orderControllers.getMyOrders
+);
+router.get("/:id", orderControllers.getAnOrder);
 router.get("/", orderControllers.getAllOrders);
 router.post("/checkout", orderControllers.checkoutCartItems);
 

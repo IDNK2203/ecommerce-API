@@ -95,6 +95,10 @@ const userSchema = new Schema(
   }
 );
 
+userSchema.virtual("fullName").get(function () {
+  return `${this.firstName} ${this.lastName}`;
+});
+
 userSchema.pre("save", async function (next) {
   // if the password was updated(including oc), hash password
   if (!this.isModified("cartInfo") || this.isNew) return next();
